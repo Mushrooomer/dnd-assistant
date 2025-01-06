@@ -1,5 +1,5 @@
 import { Router, RequestHandler } from 'express';
-import { createGame, getGames, getGame, sendMessage, deleteGame } from '../controllers/gameController';
+import { createGame, getGames, getGame, sendMessage, deleteGame, handleDiceRoll } from '../controllers/gameController';
 import { auth } from '../middleware/auth';
 import { IUser } from '../models/User';
 
@@ -18,6 +18,7 @@ router.post('/', createGame as unknown as RequestHandler);
 router.get('/', getGames as unknown as RequestHandler);
 router.get('/:id', getGame as unknown as RequestHandler);
 router.post('/:id/message', sendMessage as unknown as RequestHandler);
+router.post('/:id/roll', handleDiceRoll as unknown as RequestHandler);
 router.delete('/:id', deleteGame as unknown as RequestHandler);
 
 export default router; 

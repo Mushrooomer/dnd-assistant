@@ -62,6 +62,20 @@ const GameSession: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [rollDialogOpen, setRollDialogOpen] = useState(false);
+  const [selectedRoll, setSelectedRoll] = useState({
+    diceType: 'd20',
+    reason: ''
+  });
+
+  const commonRolls = [
+    { type: 'd20', label: 'D20 (Ability Checks, Attacks)' },
+    { type: 'd12', label: 'D12' },
+    { type: 'd10', label: 'D10' },
+    { type: 'd8', label: 'D8' },
+    { type: 'd6', label: 'D6' },
+    { type: 'd4', label: 'D4' }
+  ];
 
   useEffect(() => {
     const loadGame = async () => {
@@ -94,29 +108,18 @@ const GameSession: React.FC = () => {
   const handleSendMessage = async () => {
     if (!message.trim() || !gameId) return;
 
-    const playerMessage: Message = {
-      id: Date.now().toString(),
-      sender: 'Player',
-      content: message,
-      timestamp: new Date(),
-      type: 'player'
-    };
-
     try {
       setIsLoading(true);
       setError(null);
       
-      // Add player message immediately
-      setMessages(prev => [...prev, playerMessage]);
-      setMessage('');
-
       const response = await game.sendMessage(gameId, message);
+      setMessage('');
       
       if (!response || !Array.isArray(response.messages)) {
         throw new Error('Invalid response from server');
       }
 
-      // Add the DM's response
+      // Add all messages from the response
       const newMessages = response.messages.map((msg: any) => ({
         ...msg,
         id: Date.now().toString(),
@@ -171,21 +174,42 @@ const GameSession: React.FC = () => {
     }
   };
 
-  const handleRollDice = (diceType: string = 'd20') => {
+  const handleRollDice = async (diceType: string = 'd20', reason?: string) => {
     try {
-      const roll = Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1;
-      const rollMessage: Message = {
-        id: Date.now().toString(),
-        sender: 'System',
-        content: `🎲 Rolled a ${diceType}: ${roll}`,
-        timestamp: new Date(),
-        type: 'roll'
-      };
-      setMessages(prev => [...prev, rollMessage]);
+      if (!gameId) return;
+      
+      setIsLoading(true);
+      const response = await game.rollDice(gameId, diceType, reason);
+      
+      // Add messages from the response
+      if (response.messages) {
+        const newMessages = response.messages.map((msg: any) => ({
+          ...msg,
+          id: Date.now().toString(),
+          timestamp: new Date()
+        }));
+        setMessages(prev => [...prev, ...newMessages]);
+      }
     } catch (error) {
       console.error('Error rolling dice:', error);
       setError('Failed to roll dice');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const handleRollDialogOpen = () => {
+    setSelectedRoll({ diceType: 'd20', reason: '' });
+    setRollDialogOpen(true);
+  };
+
+  const handleRollDialogClose = () => {
+    setRollDialogOpen(false);
+  };
+
+  const handleRollSubmit = () => {
+    handleRollDice(selectedRoll.diceType, selectedRoll.reason);
+    handleRollDialogClose();
   };
 
   const renderMessage = (msg: Message) => {
@@ -242,7 +266,7 @@ const GameSession: React.FC = () => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton onClick={() => handleRollDice('d20')}>
+          <ListItemButton onClick={handleRollDialogOpen}>
             <CasinoIcon sx={{ mr: 2 }} />
             <ListItemText primary="Roll Dice" />
           </ListItemButton>
@@ -422,6 +446,51 @@ const GameSession: React.FC = () => {
           <Button onClick={() => setLeaveDialogOpen(false)}>Cancel</Button>
           <Button onClick={confirmLeaveGame} color="error" variant="contained">
             Leave Game
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Roll Dice Dialog */}
+      <Dialog open={rollDialogOpen} onClose={handleRollDialogClose}>
+        <DialogTitle>Roll Dice</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Select Dice Type
+            </Typography>
+            <Grid container spacing={1}>
+              {commonRolls.map((roll) => (
+                <Grid item xs={6} key={roll.type}>
+                  <Button
+                    fullWidth
+                    variant={selectedRoll.diceType === roll.type ? 'contained' : 'outlined'}
+                    onClick={() => setSelectedRoll(prev => ({ ...prev, diceType: roll.type }))}
+                    startIcon={<CasinoIcon />}
+                  >
+                    {roll.type}
+                  </Button>
+                </Grid>
+              ))}
+            </Grid>
+            <TextField
+              fullWidth
+              margin="normal"
+              label="Reason for Roll (optional)"
+              value={selectedRoll.reason}
+              onChange={(e) => setSelectedRoll(prev => ({ ...prev, reason: e.target.value }))}
+              placeholder="e.g., Strength check, Attack roll"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleRollDialogClose}>Cancel</Button>
+          <Button 
+            onClick={handleRollSubmit}
+            variant="contained"
+            disabled={isLoading}
+            startIcon={isLoading ? <CircularProgress size={20} /> : <CasinoIcon />}
+          >
+            Roll
           </Button>
         </DialogActions>
       </Dialog>

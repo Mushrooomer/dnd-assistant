@@ -77,6 +77,7 @@ const GameList: React.FC = () => {
     adventureId: '',
     characterId: ''
   });
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     fetchGames();
@@ -119,6 +120,7 @@ const GameList: React.FC = () => {
 
   const handleCreateGame = async () => {
     try {
+      setIsCreating(true);
       const response = await game.createSession(newGame);
       setOpen(false);
       setNewGame({ name: '', description: '', adventureId: '', characterId: '' });
@@ -128,6 +130,8 @@ const GameList: React.FC = () => {
     } catch (error: any) {
       console.error('Error creating game:', error);
       setError(error.response?.data?.message || 'Failed to create game');
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -280,7 +284,7 @@ const GameList: React.FC = () => {
           />
           <TextField
             margin="dense"
-            label="Description"
+            label="Description (Optional)"
             fullWidth
             multiline
             rows={2}
@@ -364,9 +368,10 @@ const GameList: React.FC = () => {
             onClick={handleCreateGame} 
             variant="contained" 
             color="primary"
-            disabled={!newGame.name || !newGame.description || !newGame.adventureId || !newGame.characterId}
+            disabled={!newGame.name || !newGame.adventureId || !newGame.characterId || isCreating}
+            startIcon={isCreating ? <CircularProgress size={20} /> : null}
           >
-            Create
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </DialogActions>
       </Dialog>

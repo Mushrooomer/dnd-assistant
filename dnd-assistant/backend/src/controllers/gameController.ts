@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import Game, { IGameState } from '../models/Game';
-import { generateDMResponse, analyzeAction } from '../services/aiService';
+import { generateDMResponse, analyzeAction, generateInitialStory } from '../services/aiService';
 import { IUser } from '../models/User';
 import Adventure from '../models/Adventure';
 import Character from '../models/Character';
@@ -40,8 +40,8 @@ export const createGame = async (req: AuthRequest, res: Response) => {
   try {
     const { name, description, adventureId, characterId } = req.body;
     
-    if (!name || !description || !adventureId || !characterId) {
-      return res.status(400).json({ message: 'Name, description, adventure selection, and character selection are required' });
+    if (!name || !adventureId || !characterId) {
+      return res.status(400).json({ message: 'Name, adventure selection, and character selection are required' });
     }
 
     // Get the selected adventure
@@ -50,11 +50,14 @@ export const createGame = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Selected adventure not found' });
     }
 
-    // Verify character ownership
+    // Verify character ownership and get character details
     const character = await Character.findOne({ _id: characterId, owner: req.user._id });
     if (!character) {
       return res.status(404).json({ message: 'Selected character not found or not owned by you' });
     }
+
+    // Generate an engaging initial story
+    const initialStory = await generateInitialStory(adventure, character);
 
     const initialGameState = {
       current_scene: adventure.initialScene,
@@ -88,7 +91,7 @@ export const createGame = async (req: AuthRequest, res: Response) => {
 
     const game = new Game({
       name,
-      description,
+      description: description || '',
       adventure: adventureId,
       dungeon_master: req.user._id,
       players: [{
@@ -100,7 +103,7 @@ export const createGame = async (req: AuthRequest, res: Response) => {
       status: 'active',
       messages: [{
         sender: 'DM',
-        content: `Welcome to ${adventure.title}! ${adventure.initialScene}`,
+        content: initialStory,
         timestamp: new Date(),
         type: 'dm'
       }],
@@ -306,6 +309,117 @@ export const deleteGame = async (req: AuthRequest, res: Response) => {
     console.error('Error deleting game:', error);
     res.status(500).json({ 
       message: 'Error deleting game',
+      error: error.message 
+    });
+  }
+};
+
+export const handleDiceRoll = async (req: AuthRequest, res: Response) => {
+  try {
+    const { diceType, reason } = req.body;
+    const gameId = req.params.id;
+
+    if (!diceType || !gameId) {
+      return res.status(400).json({ message: 'Dice type and game ID are required' });
+    }
+
+    const game = await Game.findById(gameId);
+    if (!game) {
+      return res.status(404).json({ message: 'Game not found' });
+    }
+
+    // Check if user has access to this game
+    const playerState = game.players.find(p => {
+      const playerId = p.player?.toString();
+      return playerId && playerId === req.user._id.toString();
+    });
+    
+    if (!playerState && game.dungeon_master.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Get the player's character
+    const character = await Character.findById(playerState?.character);
+    if (!character) {
+      return res.status(404).json({ message: 'Character not found' });
+    }
+
+    // Roll the dice
+    const roll = Math.floor(Math.random() * parseInt(diceType.slice(1))) + 1;
+
+    // Calculate modifier based on the reason (if it's an ability check)
+    let modifier = 0;
+    let modifierSource = '';
+    
+    if (reason) {
+      const lowerReason = reason.toLowerCase();
+      if (lowerReason.includes('strength') || lowerReason.includes('str')) {
+        modifier = Math.floor((character.stats.strength - 10) / 2);
+        modifierSource = 'Strength';
+      } else if (lowerReason.includes('dexterity') || lowerReason.includes('dex')) {
+        modifier = Math.floor((character.stats.dexterity - 10) / 2);
+        modifierSource = 'Dexterity';
+      } else if (lowerReason.includes('constitution') || lowerReason.includes('con')) {
+        modifier = Math.floor((character.stats.constitution - 10) / 2);
+        modifierSource = 'Constitution';
+      } else if (lowerReason.includes('intelligence') || lowerReason.includes('int')) {
+        modifier = Math.floor((character.stats.intelligence - 10) / 2);
+        modifierSource = 'Intelligence';
+      } else if (lowerReason.includes('wisdom') || lowerReason.includes('wis')) {
+        modifier = Math.floor((character.stats.wisdom - 10) / 2);
+        modifierSource = 'Wisdom';
+      } else if (lowerReason.includes('charisma') || lowerReason.includes('cha')) {
+        modifier = Math.floor((character.stats.charisma - 10) / 2);
+        modifierSource = 'Charisma';
+      }
+    }
+
+    // Create roll message
+    const rollMessage = {
+      sender: req.user.username,
+      content: `🎲 Rolled ${diceType}${reason ? ` for ${reason}` : ''}: ${roll}${
+        modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier} (${modifierSource})` : ''
+      } = ${roll + modifier}`,
+      timestamp: new Date(),
+      type: 'roll' as const
+    };
+
+    // Convert game messages to the format expected by OpenAI
+    const messageHistory = game.messages.map(msg => ({
+      role: msg.type === 'dm' ? 'assistant' : 'user',
+      content: msg.content
+    })) as { role: 'user' | 'assistant' | 'system', content: string }[];
+
+    // Get DM's interpretation of the roll
+    const dmResponse = await generateDMResponse(
+      `Game: ${game.name}. Current scene: ${game.game_state.current_scene}`,
+      `Player rolled ${diceType}${reason ? ` for ${reason}` : ''} and got ${roll + modifier} (${roll}${
+        modifier !== 0 ? ` ${modifier >= 0 ? '+' : ''}${modifier} ${modifierSource}` : ''
+      })`,
+      messageHistory,
+      game.game_state
+    );
+
+    // Create DM response message
+    const dmMessage = {
+      sender: 'DM',
+      content: dmResponse.content,
+      timestamp: new Date(),
+      type: 'dm' as const
+    };
+
+    // Save messages
+    game.messages.push(rollMessage, dmMessage);
+    await game.save();
+
+    // Return both messages
+    res.json({
+      messages: [rollMessage, dmMessage]
+    });
+  } catch (error: any) {
+    console.error('Error processing dice roll:', error);
+    res.status(500).json({ 
+      message: 'Error processing dice roll',
       error: error.message 
     });
   }

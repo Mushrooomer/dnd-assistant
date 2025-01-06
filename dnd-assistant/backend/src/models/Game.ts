@@ -68,7 +68,7 @@ export interface IGame extends Document {
 
 const gameSchema = new Schema<IGame>({
   name: { type: String, required: true },
-  description: { type: String, required: true },
+  description: { type: String, default: '' },
   adventure: { type: Schema.Types.ObjectId, ref: 'Adventure', required: true },
   dungeon_master: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   players: [{
