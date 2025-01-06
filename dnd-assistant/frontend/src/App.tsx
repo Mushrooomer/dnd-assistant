@@ -10,6 +10,8 @@ import GameSession from './components/game/GameSession';
 import MainLayout from './components/layout/MainLayout';
 import { useSelector } from 'react-redux';
 import { RootState } from './store/store';
+import CharacterList from './components/character/CharacterList';
+import CharacterCreation from './components/character/CharacterCreation';
 
 const theme = createTheme({
   palette: {
@@ -88,6 +90,22 @@ const AppContent = () => {
           element={
             <PrivateRoute>
               <GameSession />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/characters"
+          element={
+            <PrivateRoute>
+              <CharacterList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/characters/create"
+          element={
+            <PrivateRoute>
+              <CharacterCreation />
             </PrivateRoute>
           }
         />

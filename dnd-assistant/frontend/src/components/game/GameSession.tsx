@@ -117,7 +117,7 @@ const GameSession: React.FC = () => {
       }
 
       // Add the DM's response
-      const newMessages = response.messages.map(msg => ({
+      const newMessages = response.messages.map((msg: any) => ({
         ...msg,
         id: Date.now().toString(),
         timestamp: new Date()
@@ -280,63 +280,74 @@ const GameSession: React.FC = () => {
 
   return (
     <Box sx={{ 
-      display: 'flex', 
-      height: '100vh',
-      width: '100vw',
-      maxWidth: '100%',
-      overflow: 'hidden'
+      display: 'flex',
+      height: '100%',
+      width: '100%',
+      position: 'relative'
     }}>
-      {isMobile ? (
-        <Drawer
-          variant="temporary"
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        >
-          {sidebar}
-        </Drawer>
-      ) : (
-        <Drawer
-          variant="permanent"
-          sx={{
+      {/* Game Tools Sidebar */}
+      <Box
+        component="nav"
+        sx={{
+          width: { sm: 250 },
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: 'divider',
+          display: { xs: 'none', sm: 'block' }
+        }}
+      >
+        {sidebar}
+      </Box>
+
+      {/* Mobile Drawer */}
+      <Drawer
+        variant="temporary"
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        ModalProps={{
+          keepMounted: true,
+        }}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': {
             width: 250,
-            flexShrink: 0,
+            position: 'absolute',
             height: '100%',
-            '& .MuiDrawer-paper': {
-              width: 250,
-              boxSizing: 'border-box',
-              position: 'relative',
-              height: '100%',
-            },
+          },
+        }}
+      >
+        {sidebar}
+      </Drawer>
+
+      {/* Main Chat Area */}
+      <Box
+        sx={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Mobile Header */}
+        <Box
+          sx={{
+            display: { sm: 'none' },
+            p: 1,
+            borderBottom: 1,
+            borderColor: 'divider'
           }}
         >
-          {sidebar}
-        </Drawer>
-      )}
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <MenuIcon />
+          </IconButton>
+        </Box>
 
-      <Box sx={{ 
-        flex: 1, 
-        display: 'flex', 
-        flexDirection: 'column',
-        height: '100%',
-        overflow: 'hidden'
-      }}>
-        {isMobile && (
-          <AppBar position="static">
-            <Toolbar>
-              <IconButton
-                color="inherit"
-                edge="start"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <MenuIcon />
-              </IconButton>
-              <Typography variant="h6" sx={{ ml: 2 }}>
-                Game Session
-              </Typography>
-            </Toolbar>
-          </AppBar>
-        )}
-
+        {/* Messages Area */}
         <Box
           sx={{
             flex: 1,
@@ -356,6 +367,7 @@ const GameSession: React.FC = () => {
           <div ref={messagesEndRef} />
         </Box>
 
+        {/* Message Input */}
         <Box
           component="form"
           sx={{
@@ -395,6 +407,7 @@ const GameSession: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Leave Game Dialog */}
       <Dialog
         open={leaveDialogOpen}
         onClose={() => setLeaveDialogOpen(false)}
@@ -413,6 +426,7 @@ const GameSession: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Error Snackbar */}
       <Snackbar 
         open={!!error} 
         autoHideDuration={6000} 

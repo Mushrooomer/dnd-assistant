@@ -35,7 +35,7 @@ export const auth = {
 };
 
 export const game = {
-  createSession: async (data: { name: string; description: string }) => {
+  createSession: async (data: { name: string; description: string; adventureId: string }) => {
     const response = await api.post('/games', data);
     return response.data;
   },
@@ -53,6 +53,56 @@ export const game = {
   },
   deleteGame: async (gameId: string) => {
     const response = await api.delete(`/games/${gameId}`);
+    return response.data;
+  }
+};
+
+export const adventures = {
+  getAll: async () => {
+    const response = await api.get('/adventures');
+    return response.data;
+  }
+};
+
+export const characters = {
+  create: async (data: {
+    name: string;
+    race: string;
+    class: string;
+    background: string;
+    alignment: string;
+    stats: {
+      strength: number;
+      dexterity: number;
+      constitution: number;
+      intelligence: number;
+      wisdom: number;
+      charisma: number;
+    };
+    hitPoints: number;
+    maxHitPoints: number;
+    armorClass: number;
+    proficiencies: string[];
+    equipment: string[];
+    features: string[];
+  }) => {
+    const response = await api.post('/characters', data);
+    return response.data;
+  },
+  getAll: async () => {
+    const response = await api.get('/characters');
+    return response.data;
+  },
+  get: async (id: string) => {
+    const response = await api.get(`/characters/${id}`);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.patch(`/characters/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/characters/${id}`);
     return response.data;
   }
 }; 

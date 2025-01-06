@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import Game, { IGameState } from '../models/Game';
 import { generateDMResponse, analyzeAction } from '../services/aiService';
 import { IUser } from '../models/User';
+import Adventure from '../models/Adventure';
+import Character from '../models/Character';
 
 interface AuthRequest extends Request {
   user: IUser & { _id: string; username: string; };
@@ -36,23 +38,69 @@ const createInitialGameState = (name: string, description: string): IGameState =
 
 export const createGame = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, adventureId, characterId } = req.body;
     
-    if (!name || !description) {
-      return res.status(400).json({ message: 'Name and description are required' });
+    if (!name || !description || !adventureId || !characterId) {
+      return res.status(400).json({ message: 'Name, description, adventure selection, and character selection are required' });
     }
 
-    const initialGameState = createInitialGameState(name, description);
+    // Get the selected adventure
+    const adventure = await Adventure.findById(adventureId);
+    if (!adventure) {
+      return res.status(404).json({ message: 'Selected adventure not found' });
+    }
+
+    // Verify character ownership
+    const character = await Character.findOne({ _id: characterId, owner: req.user._id });
+    if (!character) {
+      return res.status(404).json({ message: 'Selected character not found or not owned by you' });
+    }
+
+    const initialGameState = {
+      current_scene: adventure.initialScene,
+      memory: {
+        key_events: [{
+          event: 'Game started',
+          timestamp: new Date(),
+          importance: 5
+        }],
+        world_state: {
+          current_location: adventure.initialScene,
+          active_quests: [{
+            title: 'Begin your adventure',
+            description: `Start your journey in ${adventure.title}`,
+            status: 'active'
+          }],
+          important_npcs: []
+        },
+        player_states: {
+          [req.user._id.toString()]: {
+            character_name: character.name,
+            class: character.class,
+            race: character.race,
+            level: character.level,
+            notable_actions: []
+          }
+        }
+      },
+      environment: {}
+    };
 
     const game = new Game({
       name,
       description,
+      adventure: adventureId,
       dungeon_master: req.user._id,
-      players: [req.user._id],
+      players: [{
+        player: req.user._id,
+        character: characterId,
+        status: 'active',
+        joined_at: new Date()
+      }],
       status: 'active',
       messages: [{
         sender: 'DM',
-        content: 'Welcome to your new adventure! You find yourself in a cozy tavern, the warm firelight casting dancing shadows on the wooden walls. The tavern keeper gives you a friendly nod. What would you like to do?',
+        content: `Welcome to ${adventure.title}! ${adventure.initialScene}`,
         timestamp: new Date(),
         type: 'dm'
       }],
