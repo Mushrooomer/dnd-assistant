@@ -51,6 +51,10 @@ export const game = {
     const response = await api.post(`/games/${gameId}/message`, { message });
     return response.data;
   },
+  rollDice: async (gameId: string, diceType: string, reason?: string) => {
+    const response = await api.post(`/games/${gameId}/roll`, { diceType, reason });
+    return response.data;
+  },
   deleteGame: async (gameId: string) => {
     const response = await api.delete(`/games/${gameId}`);
     return response.data;

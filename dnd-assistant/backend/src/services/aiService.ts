@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { IGameMemory, IGameState } from '../models/Game';
+import { IAdventure } from '../models/Adventure';
+import { ICharacter } from '../models/Character';
 
 dotenv.config();
 
@@ -17,6 +19,17 @@ Your role is to create an engaging and immersive experience while following D&D 
 Respond in character as a DM, describing scenes vividly and managing game mechanics naturally.
 Keep responses concise but descriptive, and always maintain the fantasy atmosphere.
 If players want to perform an action, indicate if they need to roll dice and which type.`;
+
+const STORY_INITIALIZATION_PROMPT = `You are an expert D&D Dungeon Master creating an engaging opening scene for a new adventure.
+Your task is to craft a compelling introduction that:
+1. Introduces the character in a way that highlights their unique traits (race, class, background)
+2. Sets up the initial scene of the adventure
+3. Creates an immediate hook or call to action
+4. Establishes the tone and atmosphere of the setting
+5. Ends with a prompt that encourages player interaction
+
+Keep the response vivid but concise (2-3 paragraphs). Focus on immersion and player agency.
+Incorporate the character's traits naturally into the narrative.`;
 
 const formatGameContext = (gameState: IGameState): string => {
   if (!gameState || !gameState.memory) {
@@ -208,5 +221,52 @@ Do not include any other text or explanation.`
       advantage: false,
       disadvantage: false
     };
+  }
+};
+
+export const generateInitialStory = async (
+  adventure: IAdventure,
+  character: ICharacter
+): Promise<string> => {
+  try {
+    const context = `
+Adventure: ${adventure.title}
+Setting: ${adventure.setting}
+Initial Scene: ${adventure.initialScene}
+
+Character:
+- Name: ${character.name}
+- Race: ${character.race}
+- Class: ${character.class}
+- Background: ${character.background}
+- Level: ${character.level}
+`;
+
+    const messages = [
+      { role: 'system', content: STORY_INITIALIZATION_PROMPT },
+      { role: 'system', content: adventure.systemPrompt },
+      { role: 'system', content: context },
+      { role: 'user', content: 'Begin the adventure with an engaging introduction.' }
+    ];
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: messages as any,
+      temperature: 0.8,
+      max_tokens: 500,
+      presence_penalty: 0.6,
+      frequency_penalty: 0.3,
+    });
+
+    if (!response?.choices?.[0]?.message?.content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    return response.choices[0].message.content;
+  } catch (error: any) {
+    console.error('Error generating initial story:', error);
+    // Provide a basic fallback introduction if the AI fails
+    return `Welcome, ${character.name}, a level ${character.level} ${character.race} ${character.class}. 
+    Your journey in ${adventure.title} begins here. ${adventure.initialScene}`;
   }
 }; 
