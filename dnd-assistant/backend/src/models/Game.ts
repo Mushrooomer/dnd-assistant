@@ -45,11 +45,20 @@ export interface IGameState {
   environment: Record<string, any>;
 }
 
+export interface IPlayerState {
+  _id?: mongoose.Types.ObjectId;
+  player: mongoose.Types.ObjectId;
+  character: mongoose.Types.ObjectId;
+  status: 'active' | 'inactive';
+  joined_at: Date;
+}
+
 export interface IGame extends Document {
   name: string;
   description: string;
+  adventure: mongoose.Types.ObjectId;
   dungeon_master: mongoose.Types.ObjectId;
-  players: mongoose.Types.ObjectId[];
+  players: IPlayerState[];
   status: 'active' | 'paused' | 'completed';
   messages: IMessage[];
   game_state: IGameState;
@@ -60,8 +69,18 @@ export interface IGame extends Document {
 const gameSchema = new Schema<IGame>({
   name: { type: String, required: true },
   description: { type: String, required: true },
+  adventure: { type: Schema.Types.ObjectId, ref: 'Adventure', required: true },
   dungeon_master: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  players: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  players: [{
+    player: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    character: { type: Schema.Types.ObjectId, ref: 'Character', required: true },
+    status: { 
+      type: String, 
+      enum: ['active', 'inactive'],
+      default: 'active'
+    },
+    joined_at: { type: Date, default: Date.now }
+  }],
   status: { 
     type: String, 
     enum: ['active', 'paused', 'completed'],

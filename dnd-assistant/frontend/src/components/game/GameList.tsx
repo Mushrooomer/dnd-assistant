@@ -22,12 +22,30 @@ import {
   CardActionArea,
   IconButton,
   Alert,
-  Snackbar
+  Snackbar,
+  MenuItem
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { game } from '../../services/api';
+import { game, adventures, characters } from '../../services/api';
 import { RootState } from '../../store/store';
+
+interface Character {
+  _id: string;
+  name: string;
+  race: string;
+  class: string;
+  level: number;
+}
+
+interface Adventure {
+  _id: string;
+  title: string;
+  description: string;
+  startingLevel: number;
+  endingLevel: number;
+  setting: string;
+}
 
 interface Game {
   _id: string;
@@ -51,13 +69,19 @@ const GameList: React.FC = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [gameToDelete, setGameToDelete] = useState<string | null>(null);
   const userId = useSelector((state: RootState) => state.auth.user?.id);
+  const [availableAdventures, setAvailableAdventures] = useState<Adventure[]>([]);
+  const [availableCharacters, setAvailableCharacters] = useState<Character[]>([]);
   const [newGame, setNewGame] = useState({
     name: '',
-    description: ''
+    description: '',
+    adventureId: '',
+    characterId: ''
   });
 
   useEffect(() => {
     fetchGames();
+    fetchAdventures();
+    fetchCharacters();
   }, []);
 
   const fetchGames = async () => {
@@ -73,11 +97,31 @@ const GameList: React.FC = () => {
     }
   };
 
+  const fetchAdventures = async () => {
+    try {
+      const response = await adventures.getAll();
+      setAvailableAdventures(response);
+    } catch (error: any) {
+      console.error('Error fetching adventures:', error);
+      setError(error.response?.data?.message || 'Failed to fetch adventures');
+    }
+  };
+
+  const fetchCharacters = async () => {
+    try {
+      const response = await characters.getAll();
+      setAvailableCharacters(response);
+    } catch (error: any) {
+      console.error('Error fetching characters:', error);
+      setError(error.response?.data?.message || 'Failed to fetch characters');
+    }
+  };
+
   const handleCreateGame = async () => {
     try {
       const response = await game.createSession(newGame);
       setOpen(false);
-      setNewGame({ name: '', description: '' });
+      setNewGame({ name: '', description: '', adventureId: '', characterId: '' });
       await fetchGames();
       // Navigate to the new game session
       navigate(`/games/${response._id}`);
@@ -239,10 +283,80 @@ const GameList: React.FC = () => {
             label="Description"
             fullWidth
             multiline
-            rows={4}
+            rows={2}
             value={newGame.description}
             onChange={(e) => setNewGame({ ...newGame, description: e.target.value })}
           />
+          <TextField
+            select
+            margin="dense"
+            label="Select Adventure"
+            fullWidth
+            value={newGame.adventureId}
+            onChange={(e) => setNewGame({ ...newGame, adventureId: e.target.value })}
+            helperText="Choose the adventure you want to play"
+          >
+            {availableAdventures.map((adventure) => (
+              <MenuItem key={adventure._id} value={adventure._id}>
+                <Box>
+                  <Typography variant="subtitle1">
+                    {adventure.title}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Levels {adventure.startingLevel}-{adventure.endingLevel} • {adventure.setting}
+                  </Typography>
+                </Box>
+              </MenuItem>
+            ))}
+          </TextField>
+          {newGame.adventureId && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                {availableAdventures.find(a => a._id === newGame.adventureId)?.description}
+              </Typography>
+            </Box>
+          )}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Choose Your Character
+            </Typography>
+            {availableCharacters.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 2 }}>
+                <Typography color="text.secondary" gutterBottom>
+                  No characters available
+                </Typography>
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate('/characters/create')}
+                  startIcon={<AddIcon />}
+                >
+                  Create New Character
+                </Button>
+              </Box>
+            ) : (
+              <TextField
+                select
+                fullWidth
+                label="Select Character"
+                value={newGame.characterId}
+                onChange={(e) => setNewGame({ ...newGame, characterId: e.target.value })}
+                helperText="Choose a character for this adventure"
+              >
+                {availableCharacters.map((character) => (
+                  <MenuItem key={character._id} value={character._id}>
+                    <Box>
+                      <Typography variant="subtitle2">
+                        {character.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Level {character.level} {character.race} {character.class}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={() => setOpen(false)}>Cancel</Button>
@@ -250,7 +364,7 @@ const GameList: React.FC = () => {
             onClick={handleCreateGame} 
             variant="contained" 
             color="primary"
-            disabled={!newGame.name || !newGame.description}
+            disabled={!newGame.name || !newGame.description || !newGame.adventureId || !newGame.characterId}
           >
             Create
           </Button>

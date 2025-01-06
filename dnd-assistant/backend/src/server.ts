@@ -6,6 +6,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
 import gameRoutes from './routes/gameRoutes';
+import adventureRoutes from './routes/adventureRoutes';
+import characterRoutes from './routes/characterRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -30,6 +32,8 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/adventures', adventureRoutes);
+app.use('/api/characters', characterRoutes);
 
 // Basic route for testing
 app.get('/api/health', (_req: Request, res: Response) => {
