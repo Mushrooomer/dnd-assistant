@@ -28,8 +28,8 @@ A modern web application that combines traditional D&D gameplay with AI-powered 
 ## Setup
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- MongoDB
+- Node.js (v16 or higher)
+- MongoDB Atlas account (free tier is sufficient)
 - OpenAI API key
 
 ### Backend Setup
@@ -45,10 +45,10 @@ A modern web application that combines traditional D&D gameplay with AI-powered 
 
 3. Create a `.env` file with the following variables:
    ```
-   PORT=3000
-   MONGODB_URI=mongodb://localhost:27017/dnd-assistant
-   JWT_SECRET=your-secret-key-here
-   OPENAI_API_KEY=your-openai-api-key-here
+   PORT=3001
+   MONGODB_URI=mongodb+srv://your_username:your_password@your_cluster.mongodb.net/dnd-assistant?retryWrites=true&w=majority
+   JWT_SECRET=your_jwt_secret
+   OPENAI_API_KEY=your_openai_api_key
    ```
 
 4. Start the development server:
