@@ -423,4 +423,166 @@ export const handleDiceRoll = async (req: AuthRequest, res: Response) => {
       error: error.message 
     });
   }
+};
+
+export const getGameCharacters = async (req: AuthRequest, res: Response) => {
+  try {
+    const gameId = req.params.id;
+    
+    if (!gameId) {
+      return res.status(400).json({ message: 'Game ID is required' });
+    }
+
+    const game = await Game.findById(gameId)
+      .populate({
+        path: 'players.character',
+        select: 'name race class level'
+      });
+
+    if (!game) {
+      return res.status(404).json({ message: 'Game not found' });
+    }
+
+    // Check if user has access to this game
+    const hasAccess = game.players.some(player => 
+      player.player?.toString() === req.user._id.toString()
+    ) || game.dungeon_master.toString() === req.user._id.toString();
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const characters = game.players
+      .filter(player => player.status === 'active')
+      .map(player => player.character);
+
+    res.json(characters);
+  } catch (error: any) {
+    console.error('Error fetching game characters:', error);
+    res.status(500).json({ 
+      message: 'Error fetching game characters',
+      error: error.message 
+    });
+  }
+};
+
+export const addCharacterToGame = async (req: AuthRequest, res: Response) => {
+  try {
+    const { characterId } = req.body;
+    const gameId = req.params.id;
+
+    if (!characterId || !gameId) {
+      return res.status(400).json({ message: 'Character ID and game ID are required' });
+    }
+
+    const game = await Game.findById(gameId);
+    if (!game) {
+      return res.status(404).json({ message: 'Game not found' });
+    }
+
+    // Check if user has access to this game
+    const hasAccess = game.players.some(player => 
+      player.player?.toString() === req.user._id.toString()
+    ) || game.dungeon_master.toString() === req.user._id.toString();
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Verify character ownership
+    const character = await Character.findOne({ _id: characterId, owner: req.user._id });
+    if (!character) {
+      return res.status(404).json({ message: 'Character not found or not owned by you' });
+    }
+
+    // Check if character is already in the game
+    const isCharacterInGame = game.players.some(player => 
+      player.character?.toString() === characterId && player.status === 'active'
+    );
+
+    if (isCharacterInGame) {
+      return res.status(400).json({ message: 'Character is already in the game' });
+    }
+
+    // Add character to game
+    game.players.push({
+      player: req.user._id,
+      character: character._id,
+      status: 'active',
+      joined_at: new Date()
+    });
+
+    // Update game state with new character
+    const playerStateKey = req.user._id.toString();
+    if (!game.game_state.memory.player_states[playerStateKey]) {
+      game.game_state.memory.player_states[playerStateKey] = {
+        character_name: character.name,
+        class: character.class,
+        race: character.race,
+        level: character.level,
+        notable_actions: []
+      };
+    }
+
+    await game.save();
+
+    // Return the updated character
+    res.json(character);
+  } catch (error: any) {
+    console.error('Error adding character to game:', error);
+    res.status(500).json({ 
+      message: 'Error adding character to game',
+      error: error.message 
+    });
+  }
+};
+
+export const removeCharacterFromGame = async (req: AuthRequest, res: Response) => {
+  try {
+    const gameId = req.params.id;
+    const characterId = req.params.characterId;
+
+    if (!characterId || !gameId) {
+      return res.status(400).json({ message: 'Character ID and game ID are required' });
+    }
+
+    const game = await Game.findById(gameId);
+    if (!game) {
+      return res.status(404).json({ message: 'Game not found' });
+    }
+
+    // Check if user has access to this game
+    const hasAccess = game.players.some(player => player.player.toString() === req.user._id.toString()) ||
+                     game.dungeon_master.toString() === req.user._id.toString();
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Find and update the player's status to inactive
+    const playerIndex = game.players.findIndex(player => 
+      player.character.toString() === characterId && 
+      player.player.toString() === req.user._id.toString()
+    );
+
+    if (playerIndex === -1) {
+      return res.status(404).json({ message: 'Character not found in game' });
+    }
+
+    game.players[playerIndex].status = 'inactive';
+
+    // Remove character from game state
+    if (game.game_state.memory.player_states[req.user._id.toString()]) {
+      delete game.game_state.memory.player_states[req.user._id.toString()];
+    }
+
+    await game.save();
+    res.json({ message: 'Character removed from game successfully' });
+  } catch (error: any) {
+    console.error('Error removing character from game:', error);
+    res.status(500).json({ 
+      message: 'Error removing character from game',
+      error: error.message 
+    });
+  }
 }; 

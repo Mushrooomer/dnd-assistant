@@ -1,5 +1,15 @@
 import { Router, RequestHandler } from 'express';
-import { createGame, getGames, getGame, sendMessage, deleteGame, handleDiceRoll } from '../controllers/gameController';
+import { 
+  createGame, 
+  getGames, 
+  getGame, 
+  sendMessage, 
+  deleteGame, 
+  handleDiceRoll,
+  getGameCharacters,
+  addCharacterToGame,
+  removeCharacterFromGame
+} from '../controllers/gameController';
 import { auth } from '../middleware/auth';
 import { IUser } from '../models/User';
 
@@ -20,5 +30,10 @@ router.get('/:id', getGame as unknown as RequestHandler);
 router.post('/:id/message', sendMessage as unknown as RequestHandler);
 router.post('/:id/roll', handleDiceRoll as unknown as RequestHandler);
 router.delete('/:id', deleteGame as unknown as RequestHandler);
+
+// Character management routes
+router.get('/:id/characters', getGameCharacters as unknown as RequestHandler);
+router.post('/:id/characters', addCharacterToGame as unknown as RequestHandler);
+router.delete('/:id/characters/:characterId', removeCharacterFromGame as unknown as RequestHandler);
 
 export default router; 

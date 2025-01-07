@@ -23,7 +23,9 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  ListItemSecondaryAction,
+  Checkbox
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -31,8 +33,9 @@ import CasinoIcon from '@mui/icons-material/Casino';
 import PersonIcon from '@mui/icons-material/Person';
 import MapIcon from '@mui/icons-material/Map';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
+import GroupIcon from '@mui/icons-material/Group';
 import { useParams, useNavigate } from 'react-router-dom';
-import { game } from '../../services/api';
+import { game, characters } from '../../services/api';
 
 interface Message {
   id: string;
@@ -48,6 +51,14 @@ interface ActionAnalysis {
   skillCheck: string | null;
   advantage: boolean;
   disadvantage: boolean;
+}
+
+interface Character {
+  _id: string;
+  name: string;
+  race: string;
+  class: string;
+  level: number;
 }
 
 const GameSession: React.FC = () => {
@@ -67,6 +78,10 @@ const GameSession: React.FC = () => {
     diceType: 'd20',
     reason: ''
   });
+  const [characterDialogOpen, setCharacterDialogOpen] = useState(false);
+  const [availableCharacters, setAvailableCharacters] = useState<Character[]>([]);
+  const [gameCharacters, setGameCharacters] = useState<Character[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState(false);
 
   const commonRolls = [
     { type: 'd20', label: 'D20 (Ability Checks, Attacks)' },
@@ -90,11 +105,13 @@ const GameSession: React.FC = () => {
           throw new Error('Invalid game data received');
         }
         setMessages(gameData.messages || []);
+        
+        // Load game characters
+        const charactersData = await game.getGameCharacters(gameId);
+        setGameCharacters(charactersData || []);
       } catch (error: any) {
         console.error('Error loading game:', error);
         setError(error.response?.data?.message || 'Failed to load game');
-        // Optionally navigate back to game list if game load fails
-        // navigate('/games');
       }
     };
 
@@ -256,6 +273,40 @@ const GameSession: React.FC = () => {
     navigate('/games');
   };
 
+  const handleCharacterDialogOpen = async () => {
+    try {
+      setIsLoadingCharacters(true);
+      const [allCharacters, gameChars] = await Promise.all([
+        characters.getAll(),
+        game.getGameCharacters(gameId!)
+      ]);
+      setAvailableCharacters(allCharacters);
+      setGameCharacters(gameChars);
+      setCharacterDialogOpen(true);
+    } catch (error: any) {
+      console.error('Error loading characters:', error);
+      setError(error.response?.data?.message || 'Failed to load characters');
+    } finally {
+      setIsLoadingCharacters(false);
+    }
+  };
+
+  const handleToggleCharacter = async (character: Character) => {
+    try {
+      const isInGame = gameCharacters.some(gc => gc._id === character._id);
+      if (isInGame) {
+        await game.removeCharacter(gameId!, character._id);
+        setGameCharacters(prev => prev.filter(gc => gc._id !== character._id));
+      } else {
+        await game.addCharacter(gameId!, character._id);
+        setGameCharacters(prev => [...prev, character]);
+      }
+    } catch (error: any) {
+      console.error('Error toggling character:', error);
+      setError(error.response?.data?.message || 'Failed to update character');
+    }
+  };
+
   const sidebar = (
     <Box sx={{ width: 250, display: 'flex', flexDirection: 'column', height: '100%' }}>
       <List>
@@ -272,6 +323,12 @@ const GameSession: React.FC = () => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
+          <ListItemButton onClick={handleCharacterDialogOpen}>
+            <GroupIcon sx={{ mr: 2 }} />
+            <ListItemText primary="Manage Characters" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
           <ListItemButton>
             <MapIcon sx={{ mr: 2 }} />
             <ListItemText primary="Map" />
@@ -280,14 +337,16 @@ const GameSession: React.FC = () => {
       </List>
       <Divider />
       <Box sx={{ p: 2 }}>
-        <Typography variant="h6">Players</Typography>
+        <Typography variant="h6">Characters</Typography>
         <List>
-          <ListItem>
-            <ListItemText primary="Player 1" secondary="Human Fighter" />
-          </ListItem>
-          <ListItem>
-            <ListItemText primary="Player 2" secondary="Elf Wizard" />
-          </ListItem>
+          {gameCharacters.map((character) => (
+            <ListItem key={character._id}>
+              <ListItemText 
+                primary={character.name}
+                secondary={`${character.race} ${character.class} (Level ${character.level})`}
+              />
+            </ListItem>
+          ))}
         </List>
       </Box>
       <Box sx={{ mt: 'auto' }}>
@@ -492,6 +551,44 @@ const GameSession: React.FC = () => {
           >
             Roll
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Character Management Dialog */}
+      <Dialog 
+        open={characterDialogOpen} 
+        onClose={() => setCharacterDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Manage Characters</DialogTitle>
+        <DialogContent>
+          {isLoadingCharacters ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <List>
+              {availableCharacters.map((character) => (
+                <ListItem key={character._id}>
+                  <ListItemText
+                    primary={character.name}
+                    secondary={`${character.race} ${character.class} (Level ${character.level})`}
+                  />
+                  <ListItemSecondaryAction>
+                    <Checkbox
+                      edge="end"
+                      onChange={() => handleToggleCharacter(character)}
+                      checked={gameCharacters.some(gc => gc._id === character._id)}
+                    />
+                  </ListItemSecondaryAction>
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCharacterDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
 
