@@ -58,6 +58,18 @@ export const game = {
   deleteGame: async (gameId: string) => {
     const response = await api.delete(`/games/${gameId}`);
     return response.data;
+  },
+  addCharacter: async (gameId: string, characterId: string) => {
+    const response = await api.post(`/games/${gameId}/characters`, { characterId });
+    return response.data;
+  },
+  removeCharacter: async (gameId: string, characterId: string) => {
+    const response = await api.delete(`/games/${gameId}/characters/${characterId}`);
+    return response.data;
+  },
+  getGameCharacters: async (gameId: string) => {
+    const response = await api.get(`/games/${gameId}/characters`);
+    return response.data;
   }
 };
 
